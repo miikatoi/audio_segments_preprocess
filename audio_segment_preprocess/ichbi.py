@@ -1,6 +1,6 @@
 from typing import Tuple, Dict, ClassVar
 
-from audio_segment_preprocess.typing import AudioSegmentLabel
+from audio_segment_preprocess.typing import AudioSegmentLabel, SegmentsAnnotation
 
 
 class ICHBIAudioSegmentLabel(AudioSegmentLabel):
@@ -18,8 +18,8 @@ class ICHBIAudioSegmentLabel(AudioSegmentLabel):
         return AudioSegmentLabel(start=float(start), end=float(end), label=cls.ICBHI_LABEL_MAP[(crackle, wheeze)])
 
 
-class ICHBISegmentsAnnotation:
+class ICHBISegmentsAnnotation(SegmentsAnnotation):
 
     @classmethod
     def from_ichbi_annotation(cls, annotation):
-        return [ICHBIAudioSegmentLabel.from_ichbi_row(row) for row in annotation.split("\n")]
+        return cls(segments=[ICHBIAudioSegmentLabel.from_ichbi_row(row) for row in annotation.split("\n")])

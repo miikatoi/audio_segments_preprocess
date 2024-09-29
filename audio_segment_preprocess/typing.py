@@ -1,5 +1,5 @@
 from pydantic import BaseModel as _BaseModel
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 import numpy as np
 from typing import List, Optional
 
@@ -22,13 +22,36 @@ class SegmentsAnnotation(BaseModel):
     segments: List[AudioSegmentLabel]
 
 
-class WaveformSample(BaseModel):
-    waveform: np.ndarray
+class WindowedAudioSample(BaseModel):
+    """
+    TODO
+    implement methods to join multiple predictions together
+    """
+
+    original_sample: "AudioSample"
+    start_idx: float
+    end_idx: float
+
+
+class AudioSample(BaseModel):
     sample_rate: int
+    annotation: Optional[SegmentsAnnotation] = None
+
+    def windowed(self, window_size: int):
+        raise NotImplementedError
+
+
+class WaveformSample(AudioSample):
+    waveform: np.ndarray
 
     """
     NOTE Ensure backends are installed https://pytorch.org/audio/main/generated/torchaudio.load.html#torchaudio.load
     """
+
+    class WindowedWaveformAudioSample(BaseModel):
+        original_sample: "AudioSample"
+        start_idx: float
+        end_idx: float
 
     @classmethod
     def from_wav_file(cls, file_name: str, sample_rate: Optional[int] = None, **kwargs):
@@ -42,17 +65,37 @@ class WaveformSample(BaseModel):
             waveform_data = resample(waveform_data)
         else:
             sample_rate = _sample_rate
-        waveform_data = waveform_data.numpy()
+        waveform_data = waveform_data.numpy().squeeze()
 
         return cls(waveform=waveform_data, sample_rate=sample_rate, **kwargs)
 
     def process(self, feature_extractor: "FeatureExtractor"):
-        features = feature_extractor(self.waveform.squeeze(), sampling_rate=self.sample_rate, return_tensors="np")
-        return SpectrumSample(spectrum=features["input_values"])
+        features = feature_extractor(self.waveform, sampling_rate=self.sample_rate, return_tensors="np")
+        return SpectrumSample(
+            spectrum=features["input_values"].squeeze(),
+            annotation=self.annotation,
+            sample_rate=self.sample_rate,
+        )
+
+    def windowed(self, window_size: int):
+        lenght = self.waveform.shape[0]
+        return [
+            self.WindowedWaveformAudioSample(
+                original_sample=self,
+                start_idx=start_idx,
+                end_idx=min(start_idx + window_size, lenght),
+            )
+            for start_idx in range(0, lenght, window_size)
+        ]
 
 
-class SpectrumSample(BaseModel):
+class SpectrumSample(AudioSample):
     spectrum: np.ndarray
+
+    class WindowedSpectrumAudioSample(BaseModel):
+        original_sample: "AudioSample"
+        start_idx: float
+        end_idx: float
 
     def plot(self):
         import librosa
@@ -62,8 +105,14 @@ class SpectrumSample(BaseModel):
         db = librosa.amplitude_to_db(spec)
         plt.imshow(db, origin="lower", aspect="auto")
         plt.show()
-        # if labels is not None:
-        #     _labels = labels.copy()
-        #     _labels[_labels == -100] = -1
-        #     plt.plot(_labels)
-        #     plt.show()
+
+    def windowed(self, window_size: int):
+        lenght = self.spectrum.shape[0]  # need to ensure time dimension is first
+        return [
+            self.WindowedSpectrumAudioSample(
+                original_sample=self,
+                start_idx=start_idx,
+                end_idx=min(start_idx + window_size, lenght),
+            )
+            for start_idx in range(0, lenght, window_size)
+        ]
