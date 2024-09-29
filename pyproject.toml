@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "audio-segment-preprocess"
+version = "0.1.0"
+description = ""
+authors = ["Miika Toikkanen"]
+license = "mit"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+pydantic = "^2.9.2"
+torchaudio = "^2.4.1"
+transformers = "^4.45.1"
+librosa = "^0.10.2.post1"
+matplotlib = "^3.9.2"
+
+
+[tool.poetry.group.dev.dependencies]
+notebook = "^7.2.2"
+ipykernel = "^6.29.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
